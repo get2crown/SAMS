@@ -1,329 +1,194 @@
-# Attendance Management System
+# AttendanceOS
 
-A professional, production-ready attendance management system with geofencing, facial recognition, and buddy sign-in prevention.
+A multi-tenant attendance management system with geofenced GPS check-in and
+facial recognition, built for companies who need reliable "were they
+actually there" attendance tracking without buying hardware.
 
-## Project Overview
+## What it does
 
-This is a full-stack application designed for companies with 20-100 employees. It provides:
+- **Geofenced check-in** — verifies the employee is within the company's
+  configured radius of the office before accepting a check-in
+- **Facial recognition with liveness detection** — a calibrated blink check
+  (not a fixed threshold) confirms a live person, not a photo, before a
+  128-d face descriptor is captured and matched server-side
+- **Multi-tenant RBAC** — `employee` → `manager` (HR/HOD) → `admin` (runs
+  one company) → `super_admin` (platform-wide, sees/edits every company)
+- **Per-company configuration** — geofence radius, late-arrival cutoff, and
+  display name are all admin-configurable, not hardcoded
+- **Employee management with real accounts** — admins create employees with
+  real login credentials (not a disconnected mock), assign roles, and reset
+  passwords
+- **Attendance history & analytics** — company-wide stats, per-employee
+  breakdowns, daily trends, and CSV payroll export
 
-- ✅ Geolocation-based attendance tracking
-- ✅ Facial recognition (biometrics) for identity verification
-- ✅ Prevent buddy sign-in with session management
-- ✅ Real-time location monitoring
-- ✅ Manager/Admin dashboards
-- ✅ Comprehensive attendance reports
-- ✅ GPS accuracy validation
-- ✅ Advanced analytics and reporting
-- ✅ Payroll system integration (CSV export)
+## Tech stack
 
-## Tech Stack
+**Frontend**: React 18 + TypeScript, Vite, Tailwind CSS, Zustand,
+`@vladmandic/face-api` (maintained TensorFlow.js face-api fork — the
+original `face-api.js` is unmaintained and breaks under modern bundlers)
 
-### Frontend
-- **React** 18 with TypeScript
-- **Tailwind CSS** for styling
-- **Vite** for fast development
-- **Zustand** for state management
-- **face-api.js** for facial recognition
-- **Axios** for API calls
+**Backend**: Node.js + Express + TypeScript, PostgreSQL, JWT auth, bcrypt
 
-### Backend
-- **Node.js** with Express.js
-- **TypeScript** for type safety
-- **PostgreSQL** for database
-- **JWT** for authentication
-- **bcryptjs** for password hashing
-- **Helmet.js** for security
+## Quick start
 
-## Project Structure
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 12+ running locally
+- A webcam + location services for the actual check-in flow
+
+### 1. Install dependencies
+
+```bash
+npm run install-all
+```
+
+### 2. Set up the database
+
+```bash
+createdb attendance_db
+psql -d attendance_db -f backend/migrations/001_create_tables.sql
+psql -d attendance_db -f backend/migrations/002_add_face_descriptor.sql
+psql -d attendance_db -f backend/migrations/003_add_employee_fields.sql
+psql -d attendance_db -f backend/migrations/004_add_company_settings.sql
+```
+
+### 3. Configure environment variables
+
+`backend/.env` (copy `backend/.env.example` and fill in):
+```
+PORT=5000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=attendance_db
+DB_USER=postgres
+DB_PASSWORD=<your postgres password>
+JWT_SECRET=<random string>
+JWT_REFRESH_SECRET=<a different random string>
+```
+
+`frontend/.env`:
+```
+VITE_API_URL=http://localhost:5000/api
+```
+
+### 4. Run it
+
+**Option A — one command, waits for each service to be ready:**
+```bash
+npm run start:silent   # Windows/PowerShell
+```
+Prints the app URL once both servers are confirmed up. Stop with:
+```bash
+npm run stop:silent
+```
+
+**Option B — both servers in one terminal, interleaved logs:**
+```bash
+npm run dev
+```
+
+Backend: `http://localhost:5000` · Frontend: `http://localhost:3000`
+
+### 5. Create your first company
+
+Go to `/register` and choose **"Create new company"** — no SQL required.
+Fill in a company name, tap **"Use my current location"** while standing at
+the office (this becomes the geofence center), and submit. You become that
+company's `admin` automatically. Teammates either register with
+**"Join existing company"** using the company ID you can find in Company
+Settings, or — better — you create their accounts directly from the
+**Employees** page with a password you set for them.
+
+### 6. (Optional) Promote yourself to platform super_admin
+
+There's no self-serve way to do this — nothing should be able to grant
+platform-wide access over HTTP without an existing super_admin approving
+it. It's a direct database operation instead:
+
+```bash
+cd backend
+npm run promote-super-admin -- you@yourcompany.com
+```
+
+This gives that account a **Platform Admin** panel to view and edit every
+company and every user on the instance, in addition to their normal access
+to their own company.
+
+## How the attendance flow actually works
+
+1. **Enroll once**: camera captures 3 face samples ~200ms apart and
+   averages them into one reference descriptor — smooths out single-frame
+   lighting/angle noise, since this becomes what every future check-in is
+   compared against.
+2. **Check-in**: camera and liveness detection start immediately; GPS
+   location is fetched in parallel in the background rather than blocking
+   the camera. A blink is detected via Eye-Aspect-Ratio calibrated to
+   *your* face at the start of each session (not a fixed threshold, which
+   doesn't generalize across faces/cameras/lighting). If no blink is caught
+   within ~7s, a manual "tap to continue" fallback appears.
+3. **Server-side verification**: the backend independently recomputes the
+   face match (never trusts a client-supplied score) at a minimum 20%
+   confidence, and checks the reported GPS accuracy against the company's
+   configured geofence radius — a device can't be more precise about
+   "inside the fence" than the fence itself, so accuracy tolerance scales
+   with the radius rather than a fixed meter value.
+4. **Buddy sign-in prevention**: a session cache blocks a second check-in
+   from the same account until checked out.
+
+## Roles
+
+| Role | Scope |
+|---|---|
+| `employee` | Check in/out, view own history |
+| `manager` | + create/edit employees, view company analytics (this is your HR/HOD tier) |
+| `admin` | + change roles, edit company settings (geofence, late cutoff, name) |
+| `super_admin` | + every company on the platform — view, edit settings, manage users, change roles |
+
+## Project structure
 
 ```
 SAMs/
 ├── backend/
-│   ├── src/
-│   │   ├── config/       # Database configuration
-│   │   ├── controllers/  # Request handlers (auth, attendance, analytics)
-│   │   ├── middleware/   # Auth, validation, error handling
-│   │   ├── routes/       # API routes (auth, attendance, analytics)
-│   │   ├── services/     # Business logic (auth, attendance, analytics)
-│   │   └── server.ts     # Entry point
-│   ├── migrations/       # Database migrations
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── .env.example
+│   ├── migrations/          # Run in order: 001 → 004
+│   ├── scripts/
+│   │   └── promote-super-admin.ts
+│   └── src/
+│       ├── config/          # DB connection
+│       ├── controllers/     # auth, attendance, biometric, employee, company, admin, analytics
+│       ├── middleware/       # JWT auth + role-based access control
+│       ├── routes/
+│       └── services/        # business logic, incl. geofence/liveness/match rules
 ├── frontend/
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Page components (Dashboard, Reports)
-│   │   ├── services/     # API client services
-│   │   ├── stores/       # Zustand state management
-│   │   ├── types/        # TypeScript type definitions
-│   │   └── utils/        # Utility functions
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── index.html
+│   ├── public/models/       # face-api.js model weights (bundled from @vladmandic/face-api)
+│   └── src/
+│       ├── components/      # CameraCheckIn, layout shell (Sidebar/Topbar)
+│       ├── pages/           # Dashboard, Attendance, History, Employees, Reports, SuperAdmin
+│       ├── services/        # API clients
+│       └── stores/          # auth state (zustand)
+├── start.ps1 / stop.ps1     # launch/stop both servers, silently, with readiness checks
+└── package.json             # root scripts: dev, build, install-all, start:silent, stop:silent
 ```
 
-## Analytics & Reporting Features
+## API overview
 
-The system provides comprehensive analytics for managers and administrators:
+All routes are prefixed `/api`. Auth via `Authorization: Bearer <token>`.
 
-### Company Overview
-- Total employees and check-in statistics
-- Hours worked and productivity metrics
-- Late arrival tracking and absence reporting
-- Average check-in/check-out times
+| Route | Access | Purpose |
+|---|---|---|
+| `POST /auth/register` | public | create company+admin, or join existing company |
+| `POST /auth/login` | public | |
+| `GET /auth/me` | any | current user + `faceEnrolled` status |
+| `POST /biometric/enroll` | any | store averaged face descriptor |
+| `POST /attendance/check-in` / `check-out` | any | geofence + liveness-verified attendance |
+| `GET /attendance/history` | any | own history |
+| `GET /employees` / `POST` / `PUT /:id` / `DELETE /:id` | manager, admin | manage employees in own company |
+| `GET /companies/me` / `PUT` | any / admin | view / edit own company settings |
+| `GET /analytics/*` | manager, admin | company stats, daily trends, payroll CSV |
+| `GET /admin/companies` / `PUT /:id` / `GET /:id/users` / `PUT /users/:id` | super_admin only | cross-company oversight |
 
-### Visual Reports
-- Daily check-in trends (bar charts)
-- Hours worked over time (line charts)
-- Employee performance comparisons
-- Date range filtering with presets
+## Known limitations / not yet built
 
-### Payroll Integration
-- CSV export functionality for payroll systems
-- Includes employee details, dates, hours worked, and status
-- Compatible with standard payroll software
-
-### Access Control
-- Analytics features available to managers and admins only
-- Secure API endpoints with role-based permissions
-│   └── README.md
-│
-└── frontend/
-    ├── src/
-    │   ├── pages/        # Page components
-    │   ├── components/   # Reusable components
-    │   ├── services/     # API & utilities
-    │   ├── stores/       # Zustand stores
-    │   ├── types/        # TypeScript types
-    │   ├── hooks/        # Custom hooks
-    │   └── App.tsx       # Main app
-    ├── public/           # Static assets
-    ├── index.html
-    ├── package.json
-    ├── vite.config.ts
-    ├── tailwind.config.ts
-    └── README.md
-```
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- PostgreSQL 12+
-- npm or yarn
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Install dependencies
-npm install
-
-# Setup environment
-cp .env.example .env
-# Update .env with your database credentials
-
-# Create database and run migrations
-# See backend/README.md for detailed steps
-
-# Start development server
-npm run dev
-```
-
-Backend runs on: `http://localhost:5000`
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Setup environment
-cp .env.example .env.local
-
-# Start development server
-npm run dev
-```
-
-Frontend runs on: `http://localhost:3000`
-
-## Key Features
-
-### 1. Geofencing & Location Validation
-- Real-time GPS monitoring
-- Haversine formula for distance calculation
-- Accuracy threshold validation
-- Prevent check-in outside office radius
-
-### 2. Facial Recognition
-- Client-side face detection using face-api.js
-- TensorFlow.js integration
-- Face descriptor comparison
-- 70% similarity threshold for verification
-
-### 3. Buddy Sign-in Prevention
-- Node-cache for session tracking
-- One active session per device
-- Automatic session cleanup
-- Device fingerprinting
-
-### 4. Authentication & Security
-- JWT with 7-day expiration
-- Refresh tokens with 30-day expiration
-- bcrypt password hashing
-- Role-based access control (RBAC)
-- Rate limiting
-- CORS configuration
-
-### 5. Database Design
-- Optimized queries with proper indexing
-- Referential integrity
-- Audit timestamps
-- Support for 100+ employees
-
-## API Documentation
-
-### Authentication Endpoints
-
-**Register User**
-```
-POST /api/auth/register
-{
-  "email": "user@company.com",
-  "password": "Password123!",
-  "firstName": "John",
-  "lastName": "Doe",
-  "phone": "+1234567890",
-  "companyId": "uuid"
-}
-```
-
-**Login**
-```
-POST /api/auth/login
-{
-  "email": "user@company.com",
-  "password": "Password123!"
-}
-```
-
-**Get Current User**
-```
-GET /api/auth/me
-Authorization: Bearer TOKEN
-```
-
-### Attendance Endpoints
-
-**Check In**
-```
-POST /api/attendance/check-in
-Authorization: Bearer TOKEN
-{
-  "latitude": 40.7128,
-  "longitude": -74.0060,
-  "accuracy": 25,
-  "faceMatchScore": 95,
-  "faceImagePath": "base64_encoded_image"
-}
-```
-
-**Check Out**
-```
-POST /api/attendance/check-out
-Authorization: Bearer TOKEN
-```
-
-**Get Attendance History**
-```
-GET /api/attendance/history?startDate=2024-01-01&endDate=2024-01-31
-Authorization: Bearer TOKEN
-```
-
-## Deployment
-
-### Backend Deployment (Self-hosted VPS)
-
-1. **VPS Setup**
-   ```bash
-   # Install Node.js and PostgreSQL
-   # Clone repository
-   # Setup environment variables
-   # Install dependencies: npm install
-   # Build: npm run build
-   # Start: npm start (use PM2 for process management)
-   ```
-
-2. **Using PM2**
-   ```bash
-   npm install -g pm2
-   pm2 start dist/server.js --name "attendance-api"
-   pm2 save
-   ```
-
-3. **Nginx Reverse Proxy**
-   ```nginx
-   server {
-       listen 80;
-       server_name api.yourdomain.com;
-       
-       location / {
-           proxy_pass http://localhost:5000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-       }
-   }
-   ```
-
-### Frontend Deployment
-
-1. **Build**
-   ```bash
-   npm run build
-   ```
-
-2. **Host on Nginx**
-   ```bash
-   # Copy dist/ to /var/www/attendance
-   # Use nginx to serve static files
-   ```
-
-## Future Enhancements
-
-- [ ] Mobile app (React Native)
-- [ ] Real-time location tracking using WebSockets
-- [ ] Advanced analytics and reporting
-- [ ] Integration with payroll systems
-- [ ] Email notifications
-- [ ] Multi-language support
-- [ ] Two-factor authentication
-- [ ] Offline mode with sync
-
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Support & Documentation
-
-- Backend: See [backend/README.md](./backend/README.md)
-- Frontend: See [frontend/README.md](./frontend/README.md)
-
-## Contact
-
-For inquiries about implementing this system, please contact the development team.
-
----
-
-**Built with ❤️ for professional attendance management**
+- Reports page backend (company stats, daily trends, payroll CSV export) is
+  live at `/api/analytics/*`, but the frontend Reports page is still a
+  placeholder — it doesn't call these endpoints yet
+- No email notifications, no mobile app, no offline mode
