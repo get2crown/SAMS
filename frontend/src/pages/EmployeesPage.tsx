@@ -3,6 +3,7 @@ import { FiPlus, FiEdit2, FiTrash2, FiUsers, FiX, FiSettings } from 'react-icons
 import { employeeService, Employee } from '../services/employeeService';
 import { companyService, Company } from '../services/companyService';
 import { useAuthStore } from '../stores/auth';
+import LocationPicker from '../components/LocationPicker';
 import toast from 'react-hot-toast';
 
 const emptyForm = {
@@ -32,6 +33,7 @@ const EmployeesPage: React.FC = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({ name: '', geofenceRadius: '', lateArrivalCutoff: '' });
+  const [officeLocation, setOfficeLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
@@ -61,6 +63,7 @@ const EmployeesPage: React.FC = () => {
         geofenceRadius: String(data.geofence_radius),
         lateArrivalCutoff: data.late_arrival_cutoff.slice(0, 5), // "HH:MM:SS" -> "HH:MM"
       });
+      setOfficeLocation({ lat: Number(data.office_latitude), lng: Number(data.office_longitude) });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Error loading company settings');
     }
@@ -74,6 +77,8 @@ const EmployeesPage: React.FC = () => {
         name: settingsForm.name || undefined,
         geofenceRadius: Number(settingsForm.geofenceRadius) || undefined,
         lateArrivalCutoff: settingsForm.lateArrivalCutoff || undefined,
+        officeLatitude: officeLocation?.lat,
+        officeLongitude: officeLocation?.lng,
       });
       setCompany(updated);
       useAuthStore.setState({ companyName: updated.name });
@@ -166,7 +171,7 @@ const EmployeesPage: React.FC = () => {
 
       {showSettings && company && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-popover">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-popover">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-900">Company Settings</h2>
               <button
@@ -177,6 +182,14 @@ const EmployeesPage: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSaveSettings} className="space-y-4 px-6 py-5">
+              <div>
+                <label className="label">Office Location</label>
+                <LocationPicker
+                  value={officeLocation}
+                  onChange={setOfficeLocation}
+                  radiusMeters={Number(settingsForm.geofenceRadius) || 500}
+                />
+              </div>
               <div>
                 <label className="label">Company Name</label>
                 <input

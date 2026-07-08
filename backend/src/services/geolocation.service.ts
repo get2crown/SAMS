@@ -90,4 +90,35 @@ export class GeolocationService {
     }
     return null;
   }
+
+  /**
+   * Forward geocoding: turn a typed address into coordinates, so a company
+   * can be set up by address instead of requiring "use my current location".
+   * Uses OpenStreetMap's Nominatim — no API key/signup required, keeping
+   * deployment simple. Nominatim's usage policy caps this at ~1 req/sec and
+   * requires an identifying User-Agent; the route calling this is rate
+   * limited accordingly (see geocode.routes.ts).
+   */
+  static async getCoordinatesFromAddress(
+    address: string
+  ): Promise<{ latitude: number; longitude: number; displayName: string } | null> {
+    try {
+      const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+        params: { q: address, format: 'json', limit: 1 },
+        headers: { 'User-Agent': 'AttendanceOS (office geofence setup)' },
+      });
+
+      const result = response.data?.[0];
+      if (!result) return null;
+
+      return {
+        latitude: parseFloat(result.lat),
+        longitude: parseFloat(result.lon),
+        displayName: result.display_name,
+      };
+    } catch (error) {
+      console.error('Forward geocoding error:', error);
+      return null;
+    }
+  }
 }

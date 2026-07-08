@@ -14,6 +14,7 @@ import analyticsRoutes from './routes/analytics.routes';
 import employeeRoutes from './routes/employee.routes';
 import companyRoutes from './routes/company.routes';
 import adminRoutes from './routes/admin.routes';
+import geocodeRoutes from './routes/geocode.routes';
 
 const app: Application = express();
 const PORT: number = parseInt(process.env.PORT as string, 10) || 5000;
@@ -50,6 +51,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/geocode', geocodeRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response): void => {

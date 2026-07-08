@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FiChevronLeft, FiUsers, FiSettings, FiX, FiShield } from 'react-icons/fi';
 import { adminService, CompanySummary } from '../services/adminService';
 import { Employee } from '../services/employeeService';
+import LocationPicker from '../components/LocationPicker';
 import toast from 'react-hot-toast';
 
 const ROLES: Employee['role'][] = ['employee', 'manager', 'admin'];
@@ -14,6 +15,7 @@ const SuperAdminPage: React.FC = () => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({ name: '', geofenceRadius: '', lateArrivalCutoff: '' });
+  const [officeLocation, setOfficeLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ const SuperAdminPage: React.FC = () => {
       geofenceRadius: String(selected.geofence_radius),
       lateArrivalCutoff: selected.late_arrival_cutoff.slice(0, 5),
     });
+    setOfficeLocation({ lat: Number(selected.office_latitude), lng: Number(selected.office_longitude) });
     setShowSettings(true);
   };
 
@@ -64,6 +67,8 @@ const SuperAdminPage: React.FC = () => {
         name: settingsForm.name,
         geofenceRadius: Number(settingsForm.geofenceRadius) || undefined,
         lateArrivalCutoff: settingsForm.lateArrivalCutoff || undefined,
+        officeLatitude: officeLocation?.lat,
+        officeLongitude: officeLocation?.lng,
       });
       setSelected({ ...selected, ...updated });
       setCompanies((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
@@ -130,7 +135,7 @@ const SuperAdminPage: React.FC = () => {
 
         {showSettings && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 px-4">
-            <div className="w-full max-w-md rounded-xl bg-white shadow-popover">
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-popover">
               <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                 <h2 className="text-base font-semibold text-gray-900">Edit {selected.name}</h2>
                 <button
@@ -141,6 +146,14 @@ const SuperAdminPage: React.FC = () => {
                 </button>
               </div>
               <form onSubmit={handleSaveSettings} className="space-y-4 px-6 py-5">
+                <div>
+                  <label className="label">Office Location</label>
+                  <LocationPicker
+                    value={officeLocation}
+                    onChange={setOfficeLocation}
+                    radiusMeters={Number(settingsForm.geofenceRadius) || 500}
+                  />
+                </div>
                 <div>
                   <label className="label">Company Name</label>
                   <input

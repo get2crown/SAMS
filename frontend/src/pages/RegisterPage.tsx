@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fi';
 import { useAuthStore } from '../stores/auth';
 import { GeolocationService } from '../services/geolocation';
+import LocationPicker from '../components/LocationPicker';
 import toast from 'react-hot-toast';
 
 type CompanyMode = 'create' | 'join';
@@ -258,7 +259,7 @@ export const RegisterPage = () => {
                       type="button"
                       onClick={useCurrentLocation}
                       disabled={locating || isLoading}
-                      className="btn-secondary w-full"
+                      className="btn-secondary mb-2 w-full"
                     >
                       {locating ? (
                         <FiLoader className="animate-spin" size={16} />
@@ -267,13 +268,13 @@ export const RegisterPage = () => {
                       ) : (
                         <FiMapPin size={16} />
                       )}
-                      {officeLocation
-                        ? `Captured (${officeLocation.lat.toFixed(4)}, ${officeLocation.lng.toFixed(4)})`
-                        : 'Use my current location'}
+                      {officeLocation ? 'Location set' : 'Use my current location'}
                     </button>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Stand at your workplace and tap this — it becomes the center of the geofence.
-                    </p>
+                    <LocationPicker
+                      value={officeLocation ? { lat: officeLocation.lat, lng: officeLocation.lng } : null}
+                      onChange={(v) => setOfficeLocation({ lat: v.lat, lng: v.lng })}
+                      radiusMeters={Number(formData.geofenceRadius) || 500}
+                    />
                   </div>
                   <div>
                     <label className="label">Geofence Radius (meters)</label>
