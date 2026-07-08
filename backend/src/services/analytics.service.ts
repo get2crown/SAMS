@@ -168,11 +168,15 @@ export class AnalyticsService {
 
     const dailyStats: DailyStats[] = [];
 
-    // Create a map of dates to stats
+    // Create a map of dates to stats. node-pg parses SQL DATE columns as JS
+    // Date objects, not strings — using row.date directly as the map key
+    // meant every lookup below (keyed by a string) silently missed, and
+    // every day fell through to "no check-ins" regardless of the real data.
     const statsMap = new Map<string, DailyStats>();
     for (const row of result.rows) {
-      statsMap.set(row.date, {
-        date: row.date,
+      const dateKey = new Date(row.date).toISOString().split('T')[0];
+      statsMap.set(dateKey, {
+        date: dateKey,
         totalCheckIns: parseInt(row.total_checkins),
         totalHours: parseFloat(row.total_hours || 0),
         lateArrivals: parseInt(row.late_arrivals || 0),
@@ -232,11 +236,34 @@ export class AnalyticsService {
     );
 
     // Create CSV header
+    const csvEscape = (value: unknown): string => {
+      const str = String(value ?? '');
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
     let csv = 'First Name,Last Name,Email,Date,Check In,Check Out,Hours Worked,Status\n';
 
-    // Add data rows
+    const formatDate = (d: Date) => new Date(d).toISOString().split('T')[0];
+    const formatTime = (d: Date) =>
+      new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    // Add data rows. hours_worked comes back from pg as a string for
+    // numeric/computed columns in some driver configurations, not a JS
+    // number, so it can't be called with .toFixed() directly.
     for (const row of result.rows) {
-      csv += `${row.first_name},${row.last_name},${row.email},${row.date},${row.check_in_time},${row.check_out_time},${row.hours_worked.toFixed(2)},${row.status}\n`;
+      const hoursWorked = Number(row.hours_worked || 0).toFixed(2);
+      csv += [
+        row.first_name,
+        row.last_name,
+        row.email,
+        formatDate(row.date),
+        formatTime(row.check_in_time),
+        formatTime(row.check_out_time),
+        hoursWorked,
+        row.status,
+      ]
+        .map(csvEscape)
+        .join(',') + '\n';
     }
 
     return csv;
