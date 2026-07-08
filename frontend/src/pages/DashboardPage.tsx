@@ -56,14 +56,18 @@ const DashboardPage: React.FC = () => {
       label: 'Check In / Out',
       description: 'Verify your face and location',
       icon: FiClock,
-      color: 'bg-brand-50 text-brand-600 group-hover:bg-brand-100',
+      iconBg: 'bg-brand-600',
+      ring: 'hover:border-brand-300 hover:ring-brand-100',
+      arrow: 'text-brand-600',
     },
     {
       to: '/history',
       label: 'Attendance History',
       description: 'Review your past records',
       icon: FiCalendar,
-      color: 'bg-violet-50 text-violet-600 group-hover:bg-violet-100',
+      iconBg: 'bg-violet-600',
+      ring: 'hover:border-violet-300 hover:ring-violet-100',
+      arrow: 'text-violet-600',
     },
     ...(isManager
       ? [
@@ -72,14 +76,18 @@ const DashboardPage: React.FC = () => {
             label: 'Manage Employees',
             description: 'Add and edit team members',
             icon: FiUsers,
-            color: 'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
+            iconBg: 'bg-amber-500',
+            ring: 'hover:border-amber-300 hover:ring-amber-100',
+            arrow: 'text-amber-600',
           },
           {
             to: '/reports',
             label: 'View Reports',
             description: 'Company-wide analytics',
             icon: FiBarChart2,
-            color: 'bg-rose-50 text-rose-600 group-hover:bg-rose-100',
+            iconBg: 'bg-rose-600',
+            ring: 'hover:border-rose-300 hover:ring-rose-100',
+            arrow: 'text-rose-600',
           },
         ]
       : []),
@@ -90,7 +98,9 @@ const DashboardPage: React.FC = () => {
             label: 'Platform Admin',
             description: 'Manage every organization',
             icon: FiShield,
-            color: 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100',
+            iconBg: 'bg-indigo-600',
+            ring: 'hover:border-indigo-300 hover:ring-indigo-100',
+            arrow: 'text-indigo-600',
           },
         ]
       : []),
@@ -151,16 +161,18 @@ const DashboardPage: React.FC = () => {
             <Link
               key={link.to}
               to={link.to}
-              className="card group flex flex-col justify-between transition hover:border-brand-300 hover:shadow-popover"
+              className={`card group flex flex-col justify-between border-2 transition hover:-translate-y-0.5 hover:shadow-popover hover:ring-4 ${link.ring}`}
             >
               <div>
-                <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg transition ${link.color}`}>
-                  <link.icon size={18} />
+                <div
+                  className={`mb-3 flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-sm transition group-hover:scale-105 ${link.iconBg}`}
+                >
+                  <link.icon size={20} />
                 </div>
-                <p className="font-medium text-gray-900">{link.label}</p>
+                <p className="text-base font-bold text-gray-900">{link.label}</p>
                 <p className="mt-1 text-sm text-gray-500">{link.description}</p>
               </div>
-              <div className="mt-4 flex items-center gap-1 text-sm font-medium text-brand-600">
+              <div className={`mt-4 flex items-center gap-1 text-sm font-bold ${link.arrow}`}>
                 Go <FiArrowRight size={14} className="transition group-hover:translate-x-0.5" />
               </div>
             </Link>
