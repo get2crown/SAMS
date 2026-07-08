@@ -1,0 +1,19 @@
+{
+  "name": "attendance-management-system",
+  "version": "1.0.0",
+  "description": "Full-stack Attendance Management System",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "install-all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "start:silent": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start.ps1",
+    "stop:silent": "powershell -NoProfile -ExecutionPolicy Bypass -File ./stop.ps1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "postgresql": "^0.0.1"
+  }
+}

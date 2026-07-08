@@ -1,0 +1,15 @@
+CONTRIBUTING.md
+LICENSE
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+build/
+uploads/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+.run-logs/
