@@ -13,12 +13,15 @@ const CAPTURE_OPTIONS = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, sc
 // never triggers for others. Instead we calibrate against each session's
 // own baseline, sampled while the tracker assumes eyes start open.
 const CALIBRATION_FRAMES = 8;
-const CLOSED_RATIO = 0.78; // dip to 78% of baseline counts as "closed"
-const OPEN_RATIO = 0.92; // recovering to 92% of baseline counts as "open" again
+const CLOSED_RATIO = 0.85; // dip to 85% of baseline counts as "closed"
+const OPEN_RATIO = 0.88; // recovering to 88% of baseline counts as "open" again
 
 export interface LivenessTracker {
   reset(): void;
-  update(landmarks: faceapi.FaceLandmarks68): boolean; // returns true once a blink has been observed
+  // landmarks is null on a frame where no face was detected at all — a
+  // brief dropout right after a stable lock is itself treated as a
+  // liveness signal (see below), not just skipped.
+  update(landmarks: faceapi.FaceLandmarks68 | null): boolean; // returns true once a blink has been observed
 }
 
 export class FaceRecognitionService {
@@ -100,6 +103,13 @@ export class FaceRecognitionService {
     let baseline: number | null = null;
     let sawClosed = false;
     let blinked = false;
+    // How many consecutive frames we've had a confident detection — used to
+    // tell "the face was locked on, then briefly vanished" (very likely a
+    // blink: closed eyes reduce the tiny-face-detector's own confidence,
+    // often below its detection threshold for a frame or two) apart from
+    // "no face has been found yet" (not a blink, just not lined up).
+    let stableFrames = 0;
+    let dropoutFrames = 0;
 
     return {
       reset() {
@@ -107,8 +117,25 @@ export class FaceRecognitionService {
         baseline = null;
         sawClosed = false;
         blinked = false;
+        stableFrames = 0;
+        dropoutFrames = 0;
       },
-      update: (landmarks: faceapi.FaceLandmarks68) => {
+      update: (landmarks: faceapi.FaceLandmarks68 | null) => {
+        if (!landmarks) {
+          stableFrames = 0;
+          dropoutFrames++;
+          // A short dropout (1-4 missed frames) right after the face was
+          // confidently tracked is treated as an implicit "eyes closed"
+          // sample, since a pure EAR reading can otherwise never see the
+          // moment of closure if the detector loses the face entirely.
+          if (baseline !== null && dropoutFrames <= 4) {
+            sawClosed = true;
+          }
+          return blinked;
+        }
+
+        dropoutFrames = 0;
+        stableFrames++;
         const ear = this.averageEAR(landmarks);
 
         if (baseline === null) {
@@ -123,7 +150,7 @@ export class FaceRecognitionService {
 
         if (ear < baseline * CLOSED_RATIO) {
           sawClosed = true;
-        } else if (sawClosed && ear > baseline * OPEN_RATIO) {
+        } else if (sawClosed && stableFrames >= 2 && ear > baseline * OPEN_RATIO) {
           blinked = true;
         }
         return blinked;

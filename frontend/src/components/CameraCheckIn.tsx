@@ -94,9 +94,9 @@ const CameraCheckIn: React.FC<CameraCheckInProps> = ({ mode, onDone }) => {
       // Cheap pass: landmarks only, no descriptor — this is what lets us
       // sample often enough to actually catch a blink.
       const detection = await faceService.detectLandmarks(videoRef.current);
-      if (!detection) return;
-
-      const blinked = livenessRef.current.update(detection.landmarks);
+      // Don't discard a missed frame — a brief detection dropout right
+      // after a stable lock is itself a liveness signal (see faceService).
+      const blinked = livenessRef.current.update(detection ? detection.landmarks : null);
       if (blinked) {
         if (detectionTimer) window.clearInterval(detectionTimer);
         if (fallbackTimer) window.clearTimeout(fallbackTimer);
