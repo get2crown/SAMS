@@ -19,7 +19,12 @@ actually there" attendance tracking without buying hardware.
   real login credentials (not a disconnected mock), assign roles, and reset
   passwords
 - **Attendance history & analytics** — company-wide stats, per-employee
-  breakdowns, daily trends, and CSV payroll export
+  breakdowns, a daily check-ins trend chart, and CSV payroll export, all on
+  the Reports page
+- **Address-based office location** — search an address (OpenStreetMap
+  Nominatim, no API key needed), drop/drag a pin on an embedded Leaflet map,
+  or use current GPS location — used both when creating a company and when
+  updating an existing one's location (e.g. after a move or a new branch)
 
 ## Tech stack
 
@@ -28,6 +33,9 @@ actually there" attendance tracking without buying hardware.
 original `face-api.js` is unmaintained and breaks under modern bundlers)
 
 **Backend**: Node.js + Express + TypeScript, PostgreSQL, JWT auth, bcrypt
+
+**Maps**: Leaflet + OpenStreetMap tiles, forward geocoding via Nominatim —
+no Google Maps API key, no billing account, no signup required
 
 ## Quick start
 
@@ -92,12 +100,18 @@ Backend: `http://localhost:5000` · Frontend: `http://localhost:3000`
 ### 5. Create your first company
 
 Go to `/register` and choose **"Create new company"** — no SQL required.
-Fill in a company name, tap **"Use my current location"** while standing at
-the office (this becomes the geofence center), and submit. You become that
-company's `admin` automatically. Teammates either register with
+Fill in a company name, then set the office location either by typing an
+address into the search box (looked up via OpenStreetMap), tapping **"Use
+my current location"** while standing at the office, or dragging the pin
+on the map — this becomes the geofence center — and submit. You become
+that company's `admin` automatically. Teammates either register with
 **"Join existing company"** using the company ID you can find in Company
 Settings, or — better — you create their accounts directly from the
 **Employees** page with a password you set for them.
+
+If the company later moves, or opens another branch, an admin (or a
+super_admin, for any company) can update the office location the same
+way from **Company Settings** — search a new address, or drag the pin.
 
 ### 6. (Optional) Promote yourself to platform super_admin
 
@@ -161,9 +175,9 @@ SAMs/
 ├── frontend/
 │   ├── public/models/       # face-api.js model weights (bundled from @vladmandic/face-api)
 │   └── src/
-│       ├── components/      # CameraCheckIn, layout shell (Sidebar/Topbar)
+│       ├── components/      # CameraCheckIn, LocationPicker (Leaflet map), layout shell (Sidebar/Topbar)
 │       ├── pages/           # Dashboard, Attendance, History, Employees, Reports, SuperAdmin
-│       ├── services/        # API clients
+│       ├── services/        # API clients (incl. geocodeService, analyticsService)
 │       └── stores/          # auth state (zustand)
 ├── start.ps1 / stop.ps1     # launch/stop both servers, silently, with readiness checks
 └── package.json             # root scripts: dev, build, install-all, start:silent, stop:silent
@@ -185,10 +199,12 @@ All routes are prefixed `/api`. Auth via `Authorization: Bearer <token>`.
 | `GET /companies/me` / `PUT` | any / admin | view / edit own company settings |
 | `GET /analytics/*` | manager, admin | company stats, daily trends, payroll CSV |
 | `GET /admin/companies` / `PUT /:id` / `GET /:id/users` / `PUT /users/:id` | super_admin only | cross-company oversight |
+| `GET /geocode?address=` | public, rate-limited | address → coordinates (Nominatim proxy) |
 
 ## Known limitations / not yet built
 
-- Reports page backend (company stats, daily trends, payroll CSV export) is
-  live at `/api/analytics/*`, but the frontend Reports page is still a
-  placeholder — it doesn't call these endpoints yet
 - No email notifications, no mobile app, no offline mode
+- Nominatim (the free geocoding service) is rate-limited to ~1 request/sec
+  and works best with fairly complete addresses — a bare city or landmark
+  name sometimes resolves to the wrong country. The map picker's
+  drag-to-adjust and click-to-place are there specifically to correct that.
